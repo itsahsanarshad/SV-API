@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS roles (
+    role_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    role_name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE
+);
