@@ -78,8 +78,8 @@ public:
 
         try {
             auto result = db_->query_params(
-                "SELECT user_uuid, user_first_name, user_last_name, email, password_hash, created_at FROM users WHERE email = $1 and password_hash = $2",
-                pqxx::params{email, password}
+                "SELECT user_uuid, first_name, last_name, email, password_hash, created_at FROM users WHERE email = $1 ",
+                pqxx::params{email}
             );
 
             if (result.empty()) {
