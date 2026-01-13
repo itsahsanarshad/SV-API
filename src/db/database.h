@@ -86,7 +86,7 @@ public:
     pqxx::result query_params(pqxx::zview sql, const pqxx::params& params) {
         auto conn = get_connection();
         pqxx::work txn(conn.get());
-        auto result = txn.exec(sql, params);
+        auto result = txn.exec_params(sql, params);
         txn.commit();
         return result;
     }
@@ -101,7 +101,7 @@ public:
     void execute_non_query_params(pqxx::zview sql, const pqxx::params& params) {
         auto conn = get_connection();
         pqxx::work txn(conn.get());
-        txn.exec(sql, params);
+        txn.exec_params(sql, params);
         txn.commit();
     }
 

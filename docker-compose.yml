@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: serenity-vault-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-serenity_vault}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${DB_EXTERNAL_PORT:-5432}:5432"
+    networks:
+      - serenity-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-serenity_vault}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Serenity Vault API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: serenity-vault-api
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-serenity_vault}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-serenity_vault_secret_key_assigned}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600}
+      SERVER_PORT: ${SERVER_PORT:-18080}
+      SERVER_THREADS: ${SERVER_THREADS:-4}
+    ports:
+      - "${API_EXTERNAL_PORT:-18080}:18080"
+    networks:
+      - serenity-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+networks:
+  serenity-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
