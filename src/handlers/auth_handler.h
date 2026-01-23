@@ -69,6 +69,54 @@ public:
         return models::make_success(data, result.message);
     }
 
+    crow::response handle_forgot_password(const crow::request& req) {
+        auto body = crow::json::load(req.body);
+
+        if (!body) {
+            return models::bad_request("Invalid JSON body");
+        }
+
+        if (!body.has("email")) {
+            return models::bad_request("Email is required");
+        }
+
+        std::string email = body["email"].s();
+
+        auto result = auth_service_->request_password_reset(email);
+
+        if (!result.success) {
+            return models::bad_request(result.message);
+        }
+
+        crow::json::wvalue data;
+        data["reset_token"] = result.token;
+
+        return models::make_success(std::move(data), result.message);
+    }
+
+    crow::response handle_reset_password(const crow::request& req) {
+        auto body = crow::json::load(req.body);
+
+        if (!body) {
+            return models::bad_request("Invalid JSON body");
+        }
+
+        if (!body.has("token") || !body.has("new_password")) {
+            return models::bad_request("Token and new password are required");
+        }
+
+        std::string token = body["token"].s();
+        std::string new_password = body["new_password"].s();
+
+        auto result = auth_service_->reset_password(token, new_password);
+
+        if (!result.success) {
+            return models::bad_request(result.message);
+        }
+
+        return models::make_success_msg(result.message);
+    }
+
 private:
     std::shared_ptr<services::AuthService> auth_service_;
 };

@@ -131,9 +131,152 @@ public:
         }
     }
 
+    struct ResetResult {
+        bool success = false;
+        std::string message;
+        std::string token;  // Token returned for direct use (no email)
+    };
+
+    ResetResult request_password_reset(const std::string& email) {
+        if (email.empty()) {
+            return {false, "Email is required", ""};
+        }
+
+        try {
+            auto result = db_->query_params(
+                "SELECT user_uuid FROM users WHERE email = $1",
+                pqxx::params{email}
+            );
+
+            if (result.empty()) {
+                return {false, "Email not found", ""};
+            }
+
+            std::string user_uuid = result[0]["user_uuid"].as<std::string>();
+            std::string token = generate_reset_token();
+            
+            // Token expires in 1 hour
+            auto now = std::chrono::system_clock::now();
+            auto expires = now + std::chrono::hours(1);
+            auto expires_time_t = std::chrono::system_clock::to_time_t(expires);
+            std::tm expires_tm;
+            #ifdef _WIN32
+                localtime_s(&expires_tm, &expires_time_t);
+            #else
+                localtime_r(&expires_time_t, &expires_tm);
+            #endif
+            
+            std::ostringstream expires_str;
+            expires_str << std::put_time(&expires_tm, "%Y-%m-%d %H:%M:%S");
+
+            db_->execute_non_query_params(
+                "INSERT INTO password_reset_tokens (user_uuid, token, expires_at) VALUES ($1, $2, $3)",
+                pqxx::params{user_uuid, token, expires_str.str()}
+            );
+
+            // Return token directly in response
+            return {true, "Password reset token generated successfully", token};
+
+        } catch (const std::exception& e) {
+            return {false, std::string("Failed to generate reset token: ") + e.what(), ""};
+        }
+    }
+
+    struct TokenValidationResult {
+        bool valid = false;
+        std::string user_uuid;
+        std::string error;
+    };
+
+    TokenValidationResult validate_reset_token(const std::string& token) {
+        if (token.empty()) {
+            return {false, "", "Token is required"};
+        }
+
+        try {
+            auto result = db_->query_params(
+                "SELECT user_uuid, expires_at, used FROM password_reset_tokens WHERE token = $1",
+                pqxx::params{token}
+            );
+
+            if (result.empty()) {
+                return {false, "", "Invalid or expired reset token"};
+            }
+
+            bool used = result[0]["used"].as<bool>();
+            if (used) {
+                return {false, "", "Token has already been used"};
+            }
+
+            std::string expires_at_str = result[0]["expires_at"].as<std::string>();
+            std::tm expires_tm = {};
+            std::istringstream ss(expires_at_str);
+            ss >> std::get_time(&expires_tm, "%Y-%m-%d %H:%M:%S");
+            
+            auto expires_time_t = std::mktime(&expires_tm);
+            auto now_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+
+            if (now_time_t > expires_time_t) {
+                return {false, "", "Token has expired"};
+            }
+
+            std::string user_uuid = result[0]["user_uuid"].as<std::string>();
+            return {true, user_uuid, ""};
+
+        } catch (const std::exception& e) {
+            return {false, "", std::string("Token validation error: ") + e.what()};
+        }
+    }
+
+    ResetResult reset_password(const std::string& token, const std::string& new_password) {
+        if (token.empty() || new_password.empty()) {
+            return {false, "Token and new password are required"};
+        }
+
+        if (new_password.length() < 6) {
+            return {false, "Password must be at least 6 characters"};
+        }
+
+        auto validation = validate_reset_token(token);
+        if (!validation.valid) {
+            return {false, validation.error};
+        }
+
+        try {
+            std::string salt = generate_salt();
+            std::string password_hash = hash_password(new_password, salt);
+
+            db_->execute_non_query_params(
+                "UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE user_uuid = $2",
+                pqxx::params{salt + ":" + password_hash, validation.user_uuid}
+            );
+
+            db_->execute_non_query_params(
+                "UPDATE password_reset_tokens SET used = TRUE WHERE token = $1",
+                pqxx::params{token}
+            );
+
+            return {true, "Password reset successfully"};
+
+        } catch (const std::exception& e) {
+            return {false, std::string("Password reset failed: ") + e.what()};
+        }
+    }
+
 private:
     std::shared_ptr<db::Database> db_;
     config::JWTConfig jwt_config_;
+
+    std::string generate_reset_token(size_t length = 32) {
+        std::vector<unsigned char> token_bytes(length);
+        RAND_bytes(token_bytes.data(), length);
+
+        std::stringstream ss;
+        for (unsigned char byte : token_bytes) {
+            ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
+        }
+        return ss.str();
+    }
 
     std::string generate_salt(size_t length = 16) {
         std::vector<unsigned char> salt(length);
