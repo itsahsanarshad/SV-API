@@ -117,6 +117,25 @@ public:
         return models::make_success_msg(result.message);
     }
 
+    crow::response handle_list_users() {
+        try {
+            auto users = auth_service_->get_all_users();
+
+            crow::json::wvalue::list user_list;
+            for (const auto& user : users) {
+                user_list.push_back(user.to_json_full());
+            }
+
+            crow::json::wvalue data;
+            data["users"] = std::move(user_list);
+            data["count"] = static_cast<int>(users.size());
+
+            return models::make_success(std::move(data));
+        } catch (const std::exception& e) {
+            return models::internal_error("Failed to fetch users", e.what());
+        }
+    }
+
 private:
     std::shared_ptr<services::AuthService> auth_service_;
 };

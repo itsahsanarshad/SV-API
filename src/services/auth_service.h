@@ -52,8 +52,9 @@ public:
             std::string salt = generate_salt();
             std::string password_hash = hash_password(password, salt);
 
+
             auto result = db_->query_params(
-                "INSERT INTO users (first_name, last_name, contact_number, email, password_hash) VALUES ($1, $2, $3, $4, $5) RETURNING user_uuid, first_name, last_name, email, password_hash, created_at",
+                "INSERT INTO users (first_name, last_name, contact_number, email, password_hash) VALUES ($1, $2, $3, $4, $5) RETURNING user_uuid, first_name, last_name, contact_number, email, password_hash, created_at",
                 pqxx::params{first_name, last_name, contact_number, email, salt + ":" + password_hash}
             );
 
@@ -78,7 +79,7 @@ public:
 
         try {
             auto result = db_->query_params(
-                "SELECT user_uuid, first_name, last_name, email, password_hash, created_at FROM users WHERE email = $1 ",
+                "SELECT user_uuid, first_name, last_name, contact_number, email, password_hash, created_at FROM users WHERE email = $1 ",
                 pqxx::params{email}
             );
 
@@ -129,6 +130,25 @@ public:
         } catch (const std::exception& e) {
             return {false, "", "", std::string("Token validation error: ") + e.what()};
         }
+    }
+
+    std::vector<models::User> get_all_users() {
+        std::vector<models::User> users;
+        
+        try {
+            auto result = db_->query(
+                "SELECT user_uuid, first_name, last_name, contact_number, email, password_hash, created_at "
+                "FROM users WHERE is_deleted = FALSE ORDER BY created_at DESC"
+            );
+
+            for (const auto& row : result) {
+                users.push_back(models::User::from_row(row));
+            }
+        } catch (const std::exception& e) {
+            // Return empty list on error
+        }
+
+        return users;
     }
 
     struct ResetResult {

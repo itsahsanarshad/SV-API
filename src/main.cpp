@@ -78,6 +78,7 @@ int main() {
     std::cout << "  POST /api/v1/auth/login    - Login user" << std::endl;
     std::cout << "  POST /api/v1/auth/forgot-password - Request password reset" << std::endl;
     std::cout << "  POST /api/v1/auth/reset-password  - Reset password with token" << std::endl;
+    std::cout << "  GET  /api/v1/auth/users    - List all users" << std::endl;
     std::cout << "  GET  /api/v1/resources     - List resources (auth required)" << std::endl;
     std::cout << "  GET  /api/v1/resources/:id - Get resource (auth required)" << std::endl;
     std::cout << "  POST /api/v1/resources     - Create resource (auth required)" << std::endl;

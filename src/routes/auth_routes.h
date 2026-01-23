@@ -26,6 +26,11 @@ inline void register_auth_routes(crow::Blueprint& bp, std::shared_ptr<handlers::
     ([handler](const crow::request& req) {
         return handler->handle_reset_password(req);
     });
+
+    CROW_BP_ROUTE(bp, "/users").methods("GET"_method)
+    ([handler]() {
+        return handler->handle_list_users();
+    });
 }
 
 } // namespace routes

@@ -11,6 +11,7 @@ struct User {
     std::string user_uuid;
     std::string first_name;
     std::string last_name;
+    std::string contact_number;
     std::string email;
     std::string password_hash;
     std::string created_at;
@@ -23,11 +24,24 @@ struct User {
         return json;
     }
 
+    // Full user details for listing (excludes password_hash)
+    crow::json::wvalue to_json_full() const {
+        crow::json::wvalue json;
+        json["id"] = user_uuid;
+        json["first_name"] = first_name;
+        json["last_name"] = last_name;
+        json["contact_number"] = contact_number;
+        json["email"] = email;
+        json["created_at"] = created_at;
+        return json;
+    }
+
     static User from_row(const pqxx::row& row) {
         User user;
         user.user_uuid = row["user_uuid"].as<std::string>();
         user.first_name = row["first_name"].as<std::string>();
         user.last_name = row["last_name"].as<std::string>();
+        user.contact_number = row["contact_number"].as<std::string>("");
         user.email = row["email"].as<std::string>();
         user.password_hash = row["password_hash"].as<std::string>();
         user.created_at = row["created_at"].as<std::string>();
