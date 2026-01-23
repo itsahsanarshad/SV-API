@@ -136,6 +136,26 @@ public:
         }
     }
 
+    crow::response handle_revoke_access(const std::string& user_uuid) {
+        auto result = auth_service_->revoke_user_access(user_uuid);
+
+        if (!result.success) {
+            return models::bad_request(result.message);
+        }
+
+        return models::make_success_msg(result.message);
+    }
+
+    crow::response handle_grant_access(const std::string& user_uuid) {
+        auto result = auth_service_->grant_user_access(user_uuid);
+
+        if (!result.success) {
+            return models::bad_request(result.message);
+        }
+
+        return models::make_success_msg(result.message);
+    }
+
 private:
     std::shared_ptr<services::AuthService> auth_service_;
 };

@@ -31,6 +31,16 @@ inline void register_auth_routes(crow::Blueprint& bp, std::shared_ptr<handlers::
     ([handler]() {
         return handler->handle_list_users();
     });
+
+    CROW_BP_ROUTE(bp, "/users/<string>").methods("DELETE"_method)
+    ([handler](const std::string& user_uuid) {
+        return handler->handle_revoke_access(user_uuid);
+    });
+
+    CROW_BP_ROUTE(bp, "/users/<string>/restore").methods("PATCH"_method)
+    ([handler](const std::string& user_uuid) {
+        return handler->handle_grant_access(user_uuid);
+    });
 }
 
 } // namespace routes

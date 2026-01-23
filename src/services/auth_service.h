@@ -79,7 +79,7 @@ public:
 
         try {
             auto result = db_->query_params(
-                "SELECT user_uuid, first_name, last_name, contact_number, email, password_hash, created_at FROM users WHERE email = $1 ",
+                "SELECT user_uuid, first_name, last_name, contact_number, email, password_hash, created_at, is_deleted FROM users WHERE email = $1 ",
                 pqxx::params{email}
             );
 
@@ -88,6 +88,12 @@ public:
             }
 
             models::User user = models::User::from_row(result[0]);
+
+            // Check if user access is revoked
+            bool is_deleted = result[0]["is_deleted"].as<bool>();
+            if (is_deleted) {
+                return {false, "", "Access denied. Your account has been revoked."};
+            }
 
             if (!verify_password(password, user.password_hash)) {
                 return {false, "", "Invalid email or password"};
@@ -149,6 +155,55 @@ public:
         }
 
         return users;
+    }
+
+    struct AccessResult {
+        bool success = false;
+        std::string message;
+    };
+
+    AccessResult revoke_user_access(const std::string& user_uuid) {
+        if (user_uuid.empty()) {
+            return {false, "User ID is required"};
+        }
+
+        try {
+            auto result = db_->query_params(
+                "UPDATE users SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE user_uuid = $1 AND is_deleted = FALSE RETURNING user_uuid",
+                pqxx::params{user_uuid}
+            );
+
+            if (result.empty()) {
+                return {false, "User not found or already revoked"};
+            }
+
+            return {true, "User access revoked successfully"};
+
+        } catch (const std::exception& e) {
+            return {false, std::string("Failed to revoke access: ") + e.what()};
+        }
+    }
+
+    AccessResult grant_user_access(const std::string& user_uuid) {
+        if (user_uuid.empty()) {
+            return {false, "User ID is required"};
+        }
+
+        try {
+            auto result = db_->query_params(
+                "UPDATE users SET is_deleted = FALSE, updated_at = CURRENT_TIMESTAMP WHERE user_uuid = $1 AND is_deleted = TRUE RETURNING user_uuid",
+                pqxx::params{user_uuid}
+            );
+
+            if (result.empty()) {
+                return {false, "User not found or already active"};
+            }
+
+            return {true, "User access granted successfully"};
+
+        } catch (const std::exception& e) {
+            return {false, std::string("Failed to grant access: ") + e.what()};
+        }
     }
 
     struct ResetResult {
