@@ -143,8 +143,8 @@ public:
         
         try {
             auto result = db_->query(
-                "SELECT user_uuid, first_name, last_name, contact_number, email, password_hash, created_at "
-                "FROM users WHERE is_deleted = FALSE ORDER BY created_at DESC"
+                "SELECT user_uuid, first_name, last_name, contact_number, email, password_hash, created_at, is_deleted "
+                "FROM users ORDER BY created_at DESC"
             );
 
             for (const auto& row : result) {

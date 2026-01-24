@@ -15,6 +15,7 @@ struct User {
     std::string email;
     std::string password_hash;
     std::string created_at;
+    bool is_deleted = false;
 
     crow::json::wvalue to_json() const {
         crow::json::wvalue json;
@@ -33,6 +34,7 @@ struct User {
         json["contact_number"] = contact_number;
         json["email"] = email;
         json["created_at"] = created_at;
+        json["status"] = is_deleted ? "deleted" : "active";
         return json;
     }
 
@@ -45,6 +47,12 @@ struct User {
         user.email = row["email"].as<std::string>();
         user.password_hash = row["password_hash"].as<std::string>();
         user.created_at = row["created_at"].as<std::string>();
+        // Check if is_deleted column exists in result
+        try {
+            user.is_deleted = row["is_deleted"].as<bool>(false);
+        } catch (...) {
+            user.is_deleted = false;
+        }
         return user;
     }
 };
