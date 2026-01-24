@@ -206,6 +206,66 @@ public:
         }
     }
 
+    struct UpdateResult {
+        bool success = false;
+        std::string message;
+        models::User user;
+    };
+
+    UpdateResult update_user(
+        const std::string& user_uuid,
+        const std::string& first_name,
+        const std::string& last_name,
+        const std::string& email,
+        const std::string& contact_number) {
+        
+        if (user_uuid.empty()) {
+            return {false, "User ID is required", {}};
+        }
+
+        // Validate email if provided
+        if (!email.empty() && !config::is_valid_email(email)) {
+            return {false, "Invalid email format", {}};
+        }
+
+        try {
+            // Check if email is already taken by another user
+            if (!email.empty()) {
+                auto existing = db_->query_params(
+                    "SELECT user_uuid FROM users WHERE email = $1 AND user_uuid != $2",
+                    pqxx::params{email, user_uuid}
+                );
+
+                if (!existing.empty()) {
+                    return {false, "Email already in use by another user", {}};
+                }
+            }
+
+            // Update user
+            auto result = db_->query_params(
+                "UPDATE users SET "
+                "first_name = COALESCE(NULLIF($2, ''), first_name), "
+                "last_name = COALESCE(NULLIF($3, ''), last_name), "
+                "email = COALESCE(NULLIF($4, ''), email), "
+                "contact_number = COALESCE(NULLIF($5, ''), contact_number), "
+                "updated_at = CURRENT_TIMESTAMP "
+                "WHERE user_uuid = $1 AND is_deleted = FALSE "
+                "RETURNING user_uuid, first_name, last_name, contact_number, email, password_hash, created_at",
+                pqxx::params{user_uuid, first_name, last_name, email, contact_number}
+            );
+
+            if (result.empty()) {
+                return {false, "User not found or has been deleted", {}};
+            }
+
+            models::User updated_user = models::User::from_row(result[0]);
+            return {true, "User updated successfully", updated_user};
+
+        } catch (const std::exception& e) {
+            return {false, std::string("Failed to update user: ") + e.what(), {}};
+        }
+    }
+
     struct ResetResult {
         bool success = false;
         std::string message;

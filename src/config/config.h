@@ -2,12 +2,19 @@
 
 #include <string>
 #include <cstdlib>
+#include <regex>
 
 namespace config {
 
 inline std::string get_env(const std::string& key, const std::string& default_value = "") {
     const char* val = std::getenv(key.c_str());
     return val ? std::string(val) : default_value;
+}
+
+inline bool is_valid_email(const std::string& email) {
+    if (email.empty() || email.length() > 255) return false;
+    std::regex email_regex(R"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})");
+    return std::regex_match(email, email_regex);
 }
 
 struct DatabaseConfig {

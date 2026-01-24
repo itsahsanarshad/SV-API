@@ -79,6 +79,7 @@ int main() {
     std::cout << "  POST /api/v1/auth/forgot-password - Request password reset" << std::endl;
     std::cout << "  POST /api/v1/auth/reset-password  - Reset password with token" << std::endl;
     std::cout << "  GET  /api/v1/auth/users    - List all users" << std::endl;
+    std::cout << "  PUT  /api/v1/auth/users/:id - Update user information" << std::endl;
     std::cout << "  DELETE /api/v1/auth/users/:id - Revoke user access (soft delete)" << std::endl;
     std::cout << "  PATCH /api/v1/auth/users/:id/restore - Grant user access (restore)" << std::endl;
     std::cout << "  GET  /api/v1/resources     - List resources (auth required)" << std::endl;

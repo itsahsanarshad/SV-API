@@ -156,6 +156,35 @@ public:
         return models::make_success_msg(result.message);
     }
 
+    crow::response handle_update_user(const crow::request& req, const std::string& user_uuid) {
+        try {
+            auto body = crow::json::load(req.body);
+            if (!body) {
+                return models::bad_request("Invalid JSON");
+            }
+
+            std::string first_name = body.has("first_name") ? std::string(body["first_name"].s()) : std::string();
+            std::string last_name = body.has("last_name") ? std::string(body["last_name"].s()) : std::string();
+            std::string email = body.has("email") ? std::string(body["email"].s()) : std::string();
+            std::string contact_number = body.has("contact_number") ? std::string(body["contact_number"].s()) : std::string();
+
+            auto result = auth_service_->update_user(user_uuid, first_name, last_name, email, contact_number);
+
+            if (!result.success) {
+                return models::bad_request(result.message);
+            }
+
+            crow::json::wvalue data;
+            data["user"] = result.user.to_json();
+            data["message"] = result.message;
+
+            return models::make_success(std::move(data));
+
+        } catch (const std::exception& e) {
+            return models::internal_error("Failed to update user", e.what());
+        }
+    }
+
 private:
     std::shared_ptr<services::AuthService> auth_service_;
 };
