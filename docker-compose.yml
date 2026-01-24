@@ -6,6 +6,7 @@ services:
     image: postgres:16-alpine
     container_name: serenity-vault-db
     restart: unless-stopped
+    network_mode: host
     environment:
       POSTGRES_DB: ${DB_NAME:-serenity_vault}
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -13,10 +14,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/init-db:/docker-entrypoint-initdb.d:ro
-    ports:
-      - "${DB_EXTERNAL_PORT:-5432}:5432"
-    networks:
-      - serenity-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-serenity_vault}"]
       interval: 10s
@@ -31,8 +28,9 @@ services:
       dockerfile: Dockerfile
     container_name: serenity-vault-api
     restart: unless-stopped
+    network_mode: host
     environment:
-      DB_HOST: postgres
+      DB_HOST: localhost
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-serenity_vault}
       DB_USER: ${DB_USER:-postgres}
@@ -41,10 +39,6 @@ services:
       JWT_EXPIRATION: ${JWT_EXPIRATION:-3600}
       SERVER_PORT: ${SERVER_PORT:-18080}
       SERVER_THREADS: ${SERVER_THREADS:-4}
-    ports:
-      - "${API_EXTERNAL_PORT:-18080}:18080"
-    networks:
-      - serenity-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,10 +48,6 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
-
-networks:
-  serenity-network:
-    driver: bridge
 
 volumes:
   postgres_data:
