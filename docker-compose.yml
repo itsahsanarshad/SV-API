@@ -48,6 +48,11 @@ services:
       SMTP_FROM_NAME: Serenity Vault
       SMTP_USE_TLS: true
       FRONTEND_URL: https://serenity-frontend-nine.vercel.app
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    extra_hosts:
+      - "smtp.protonmail.ch:185.70.42.135"
     depends_on:
       postgres:
         condition: service_healthy
