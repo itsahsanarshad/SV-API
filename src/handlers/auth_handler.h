@@ -188,6 +188,29 @@ public:
         }
     }
 
+    crow::response handle_update_password(const crow::request& req) {
+        auto body = crow::json::load(req.body);
+        if (!body) {
+            return models::bad_request("Invalid JSON body");
+        }
+
+        if (!body.has("email") || !body.has("old_password") || !body.has("new_password")) {
+            return models::bad_request("Email, old password, and new password are required");
+        }
+
+        std::string email = body["email"].s();
+        std::string old_password = body["old_password"].s();
+        std::string new_password = body["new_password"].s();
+
+        auto result = auth_service_->update_password(email, old_password, new_password);
+
+        if (!result.success) {
+            return models::bad_request(result.message);
+        }
+
+        return models::make_success_msg(result.message);
+    }
+
 private:
     std::shared_ptr<services::AuthService> auth_service_;
 };

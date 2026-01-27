@@ -46,6 +46,11 @@ inline void register_auth_routes(crow::Blueprint& bp, std::shared_ptr<handlers::
     ([handler](const crow::request& req, const std::string& user_uuid) {
         return handler->handle_update_user(req, user_uuid);
     });
+
+    CROW_BP_ROUTE(bp, "/update-password").methods("POST"_method)
+    ([handler](const crow::request& req) {
+        return handler->handle_update_password(req);
+    });
 }
 
 } // namespace routes
