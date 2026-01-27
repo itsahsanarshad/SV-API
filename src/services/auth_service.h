@@ -267,6 +267,54 @@ public:
         }
     }
 
+    AuthResult update_password(const std::string& email, const std::string& old_password, const std::string& new_password) {
+        if (email.empty() || old_password.empty() || new_password.empty()) {
+            return {false, "", "Email, old password, and new password are required"};
+        }
+
+        if (new_password.length() < 6) {
+            return {false, "", "New password must be at least 6 characters"};
+        }
+
+        try {
+            // Find user by email
+            auto result = db_->query_params(
+                "SELECT user_uuid, password_hash FROM users WHERE email = $1",
+                pqxx::params{email}
+            );
+
+            if (result.empty()) {
+                return {false, "", "User not found"};
+            }
+
+            std::string user_uuid = result[0]["user_uuid"].c_str();
+            std::string stored_hash = result[0]["password_hash"].c_str();
+
+            // Verify old password
+            if (!verify_password(old_password, stored_hash)) {
+                return {false, "", "Incorrect old password"};
+            }
+
+            // Generate new salt and hash for new password
+            std::string salt = generate_salt();
+            std::string new_hash = hash_password(new_password, salt);
+            std::string new_stored_hash = salt + ":" + new_hash;
+
+            // Update password in database
+            auto update_result = db_->query_params(
+                "UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE user_uuid = $2",
+                pqxx::params{new_stored_hash, user_uuid}
+            );
+
+            return {true, "", "Password updated successfully"};
+
+        } catch (const std::exception& e) {
+            return {false, "", std::string("Failed to update password: ") + e.what()};
+        }
+    }
+
+
+
     struct ResetResult {
         bool success = false;
         std::string message;
