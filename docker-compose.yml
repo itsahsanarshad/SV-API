@@ -39,20 +39,8 @@ services:
       JWT_EXPIRATION: ${JWT_EXPIRATION:-3600}
       SERVER_PORT: ${SERVER_PORT:-18080}
       SERVER_THREADS: ${SERVER_THREADS:-4}
-      # SMTP Configuration for ProtonMail
-      SMTP_HOST: smtp.protonmail.ch
-      SMTP_PORT: 587
-      SMTP_USER: info@serenityvault.com
-      SMTP_PASSWORD: RTNM5X84BUGXXRBJ
-      SMTP_FROM_EMAIL: info@serenityvault.com
-      SMTP_FROM_NAME: Serenity Vault
-      SMTP_USE_TLS: true
-      FRONTEND_URL: https://serenity-frontend-nine.vercel.app
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-    extra_hosts:
-      - "smtp.protonmail.ch:185.70.42.135"
+      # Frontend URL for API proxy (email service uses this)
+      FRONTEND_URL: https://serenityvault.com
     depends_on:
       postgres:
         condition: service_healthy

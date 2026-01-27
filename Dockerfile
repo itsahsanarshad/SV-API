@@ -97,7 +97,7 @@ ENV DB_HOST=postgres \
     SMTP_FROM_EMAIL=info@serenityvault.com \
     SMTP_FROM_NAME="Serenity Vault" \
     SMTP_USE_TLS=true \
-    FRONTEND_URL=http://localhost:3000
+    FRONTEND_URL=https://serenityvault.com
  
 # Expose the application port
 EXPOSE 18080
