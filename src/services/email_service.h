@@ -70,27 +70,39 @@ private:
         std::string payload_text = build_email_payload(to_email, subject, html_body);
 
         try {
+            // ProtonMail SMTP settings
             std::string url = "smtp://" + config_.smtp_host + ":" + config_.smtp_port;
             
             curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+            
+            // Use STARTTLS (not implicit SSL)
             curl_easy_setopt(curl, CURLOPT_USE_SSL, (long)CURLUSESSL_ALL);
+            
+            // Set username and password
             curl_easy_setopt(curl, CURLOPT_USERNAME, config_.smtp_user.c_str());
             curl_easy_setopt(curl, CURLOPT_PASSWORD, config_.smtp_password.c_str());
             
+            // Set mail from
             std::string mail_from = "<" + config_.from_email + ">";
             curl_easy_setopt(curl, CURLOPT_MAIL_FROM, mail_from.c_str());
             
+            // Set mail to
             std::string mail_to = "<" + to_email + ">";
             recipients = curl_slist_append(recipients, mail_to.c_str());
             curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
             
+            // Set payload
             curl_easy_setopt(curl, CURLOPT_READFUNCTION, payload_source);
             curl_easy_setopt(curl, CURLOPT_READDATA, &payload_text);
             curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
             
-            // Enable verbose output for debugging (can be disabled in production)
-            // curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+            // Enable verbose output for debugging
+            curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
             
+            // Set timeout
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+            
+            // Perform the send
             res = curl_easy_perform(curl);
             
             curl_slist_free_all(recipients);
