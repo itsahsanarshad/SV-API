@@ -81,17 +81,20 @@ public:
         }
 
         std::string email = body["email"].s();
+        std::string locale = body.has("locale") ? std::string(body["locale"].s()) : "en";
 
-        auto result = auth_service_->request_password_reset(email);
+        // Validate locale (supported: en, es, fr)
+        if (locale != "en" && locale != "es" && locale != "fr") {
+            locale = "en"; // Default to English for unsupported locales
+        }
+
+        auto result = auth_service_->request_password_reset(email, locale);
 
         if (!result.success) {
             return models::bad_request(result.message);
         }
 
-        crow::json::wvalue data;
-        data["reset_token"] = result.token;
-
-        return models::make_success(std::move(data), result.message);
+        return models::make_success_msg(result.message);
     }
 
     crow::response handle_reset_password(const crow::request& req) {

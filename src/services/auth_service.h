@@ -10,13 +10,14 @@
 #include "config/config.h"
 #include "db/database.h"
 #include "models/user.h"
+#include "services/email_service.h"
 
 namespace services {
 
 class AuthService {
 public:
-    AuthService(std::shared_ptr<db::Database> database, const config::JWTConfig& jwt_config)
-        : db_(database), jwt_config_(jwt_config) {}
+    AuthService(std::shared_ptr<db::Database> database, const config::JWTConfig& jwt_config, std::shared_ptr<EmailService> email_service = nullptr)
+        : db_(database), jwt_config_(jwt_config), email_service_(email_service) {}
 
     struct AuthResult {
         bool success = false;
@@ -269,12 +270,11 @@ public:
     struct ResetResult {
         bool success = false;
         std::string message;
-        std::string token;  // Token returned for direct use (no email)
     };
 
-    ResetResult request_password_reset(const std::string& email) {
+    ResetResult request_password_reset(const std::string& email, const std::string& locale = "en") {
         if (email.empty()) {
-            return {false, "Email is required", ""};
+            return {false, "Email is required"};
         }
 
         try {
@@ -284,7 +284,8 @@ public:
             );
 
             if (result.empty()) {
-                return {false, "Email not found", ""};
+                // Security: Don't reveal if email exists or not
+                return {true, "If the email exists, a password reset link has been sent"};
             }
 
             std::string user_uuid = result[0]["user_uuid"].as<std::string>();
@@ -309,11 +310,20 @@ public:
                 pqxx::params{user_uuid, token, expires_str.str()}
             );
 
-            // Return token directly in response
-            return {true, "Password reset token generated successfully", token};
+            // Send email with reset link
+            if (email_service_) {
+                auto email_result = email_service_->send_password_reset_email(email, token, locale);
+                if (!email_result.success) {
+                    return {false, "Failed to send password reset email: " + email_result.message};
+                }
+            } else {
+                return {false, "Email service not configured"};
+            }
+
+            return {true, "Password reset email sent successfully"};
 
         } catch (const std::exception& e) {
-            return {false, std::string("Failed to generate reset token: ") + e.what(), ""};
+            return {false, std::string("Failed to process password reset request: ") + e.what()};
         }
     }
 
@@ -401,6 +411,7 @@ public:
 private:
     std::shared_ptr<db::Database> db_;
     config::JWTConfig jwt_config_;
+    std::shared_ptr<EmailService> email_service_;
 
     std::string generate_reset_token(size_t length = 32) {
         std::vector<unsigned char> token_bytes(length);

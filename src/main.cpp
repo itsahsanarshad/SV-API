@@ -5,6 +5,7 @@
 #include "config/config.h"
 #include "db/database.h"
 #include "services/auth_service.h"
+#include "services/email_service.h"
 #include "middleware/auth_middleware.h"
 #include "middleware/cors_middleware.h"
 #include "handlers/auth_handler.h"
@@ -20,7 +21,10 @@ int main() {
     std::cout << "Initializing database connection..." << std::endl;
     auto database = db::create_database(app_config.database);
 
-    auto auth_service = std::make_shared<services::AuthService>(database, app_config.jwt);
+    std::cout << "Initializing email service..." << std::endl;
+    auto email_service = std::make_shared<services::EmailService>(app_config.email);
+
+    auto auth_service = std::make_shared<services::AuthService>(database, app_config.jwt, email_service);
     auto resource_repository = std::make_shared<repositories::ResourceRepository>(database);
 
     auto auth_handler = std::make_shared<handlers::AuthHandler>(auth_service);

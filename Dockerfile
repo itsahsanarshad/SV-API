@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     git \
     libpq-dev \
     libssl-dev \
+    libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*
  
 # Build libpqxx 7.x from source (required for pqxx::params support)
@@ -53,6 +54,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     libpq5 \
     libssl3 \
+    libcurl4 \
     curl \
     && rm -rf /var/lib/apt/lists/*
  
@@ -87,7 +89,15 @@ ENV DB_HOST=postgres \
     JWT_SECRET=serenity_vault_secret_key_assigned \
     JWT_EXPIRATION=3600 \
     SERVER_PORT=18080 \
-    SERVER_THREADS=4
+    SERVER_THREADS=4 \
+    SMTP_HOST=smtp.protonmail.ch \
+    SMTP_PORT=587 \
+    SMTP_USER=info@serenityvault.com \
+    SMTP_PASSWORD="" \
+    SMTP_FROM_EMAIL=info@serenityvault.com \
+    SMTP_FROM_NAME="Serenity Vault" \
+    SMTP_USE_TLS=true \
+    FRONTEND_URL=http://localhost:3000
  
 # Expose the application port
 EXPOSE 18080

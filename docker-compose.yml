@@ -39,6 +39,8 @@ services:
       JWT_EXPIRATION: ${JWT_EXPIRATION:-3600}
       SERVER_PORT: ${SERVER_PORT:-18080}
       SERVER_THREADS: ${SERVER_THREADS:-4}
+      SMTP_PASSWORD: RTNM5X84BUGXXRBJ
+      FRONTEND_URL: https://serenity-frontend-nine.vercel.app
     depends_on:
       postgres:
         condition: service_healthy

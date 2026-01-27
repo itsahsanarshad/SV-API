@@ -9,7 +9,7 @@ CXXFLAGS = -std=c++17 -Wall \
 
 LDFLAGS = -L/usr/local/opt/libpqxx/lib \
     -L/usr/local/opt/libpq/lib \
-    -lpthread -lpqxx -lpq -lssl -lcrypto
+    -lpthread -lpqxx -lpq -lssl -lcrypto -lcurl
 
 SRC = src/main.cpp
 TARGET = crow_app

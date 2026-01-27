@@ -7,7 +7,7 @@ CXXFLAGS = -std=c++17 -Wall \
     -I/usr/local/include
 
 LDFLAGS = -L/usr/local/lib \
-    -lpthread -lpqxx -lpq -lssl -lcrypto
+    -lpthread -lpqxx -lpq -lssl -lcrypto -lcurl
 
 SRC = src/main.cpp
 TARGET = crow_app

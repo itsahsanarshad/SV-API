@@ -43,10 +43,22 @@ struct ServerConfig {
     int threads = std::stoi(get_env("SERVER_THREADS", "4"));
 };
 
+struct EmailConfig {
+    std::string smtp_host = get_env("SMTP_HOST", "smtp.protonmail.ch");
+    std::string smtp_port = get_env("SMTP_PORT", "587");
+    std::string smtp_user = get_env("SMTP_USER", "info@serenityvault.com");
+    std::string smtp_password = get_env("SMTP_PASSWORD", "");
+    std::string from_email = get_env("SMTP_FROM_EMAIL", "info@serenityvault.com");
+    std::string from_name = get_env("SMTP_FROM_NAME", "Serenity Vault");
+    std::string frontend_url = get_env("FRONTEND_URL", "http://localhost:3000");
+    bool use_tls = get_env("SMTP_USE_TLS", "true") == "true";
+};
+
 struct AppConfig {
     DatabaseConfig database;
     JWTConfig jwt;
     ServerConfig server;
+    EmailConfig email;
 };
 
 inline AppConfig load_config() {
