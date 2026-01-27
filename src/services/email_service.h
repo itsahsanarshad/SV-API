@@ -30,15 +30,82 @@ public:
         const std::string& reset_token,
         const std::string& locale = "en"
     ) {
-        std::string reset_link = config_.frontend_url + "/reset-password?token=" + reset_token;
-        std::string subject = get_subject(locale);
-        std::string html_body = get_email_template(locale, reset_link, to_email);
-
-        return send_email(to_email, subject, html_body);
+        // Use frontend API proxy to send email (frontend has working ProtonMail setup)
+        return send_via_frontend_api(to_email, reset_token, locale);
     }
 
 private:
     config::EmailConfig config_;
+
+    // Send email via frontend API proxy
+    EmailResult send_via_frontend_api(
+        const std::string& to_email,
+        const std::string& reset_token,
+        const std::string& locale
+    ) {
+        CURL* curl = curl_easy_init();
+        if (!curl) {
+            return {false, "Failed to initialize CURL"};
+        }
+
+        CURLcode res;
+        std::string response_data;
+
+        try {
+            // Frontend API endpoint
+            std::string api_url = config_.frontend_url + "/api/send-password-reset";
+            
+            // Build JSON payload
+            std::ostringstream json_payload;
+            json_payload << "{"
+                        << "\"email\":\"" << to_email << "\","
+                        << "\"resetToken\":\"" << reset_token << "\","
+                        << "\"locale\":\"" << locale << "\""
+                        << "}";
+            std::string payload = json_payload.str();
+
+            // Set CURL options
+            curl_easy_setopt(curl, CURLOPT_URL, api_url.c_str());
+            curl_easy_setopt(curl, CURLOPT_POST, 1L);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload.c_str());
+            
+            // Set headers
+            struct curl_slist* headers = nullptr;
+            headers = curl_slist_append(headers, "Content-Type: application/json");
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+            
+            // Capture response
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_data);
+            
+            // Set timeout
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+            
+            // Perform request
+            res = curl_easy_perform(curl);
+            
+            curl_slist_free_all(headers);
+            curl_easy_cleanup(curl);
+            
+            if (res != CURLE_OK) {
+                return {false, std::string("Failed to call frontend API: ") + curl_easy_strerror(res)};
+            }
+            
+            return {true, "Email sent via frontend API"};
+            
+        } catch (const std::exception& e) {
+            curl_easy_cleanup(curl);
+            return {false, std::string("Exception calling frontend API: ") + e.what()};
+        }
+    }
+
+    // Callback to capture HTTP response
+    static size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+        auto* response = static_cast<std::string*>(userdata);
+        size_t total_size = size * nmemb;
+        response->append(ptr, total_size);
+        return total_size;
+    }
 
     static size_t payload_source(char* ptr, size_t size, size_t nmemb, void* userp) {
         auto* upload_ctx = static_cast<std::string*>(userp);
