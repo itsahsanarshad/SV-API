@@ -20,6 +20,9 @@ struct User {
     crow::json::wvalue to_json() const {
         crow::json::wvalue json;
         json["id"] = user_uuid;
+        json["first_name"] = first_name;
+        json["last_name"] = last_name;
+        json["full_name"] = first_name + " " + last_name;
         json["email"] = email;
         json["created_at"] = created_at;
         return json;
