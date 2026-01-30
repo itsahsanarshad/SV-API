@@ -12,6 +12,7 @@ struct JWTAuth {
         bool authenticated = false;
         std::string user_id;
         std::string email;
+        std::string full_name;
         std::string error;
     };
 
@@ -68,6 +69,7 @@ struct JWTAuth {
         ctx.authenticated = true;
         ctx.user_id = payload.user_id;
         ctx.email = payload.email;
+        ctx.full_name = payload.full_name;
     }
 
     void after_handle(crow::request& req, crow::response& res, context& ctx) {

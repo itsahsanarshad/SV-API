@@ -64,7 +64,8 @@ public:
             }
 
             models::User user = models::User::from_row(result[0]);
-            std::string token = generate_token(user.user_uuid, user.email);
+            std::string full_name = user.first_name + " " + user.last_name;
+            std::string token = generate_token(user.user_uuid, user.email, full_name);
 
             return {true, token, "User registered successfully", user};
 
@@ -100,7 +101,8 @@ public:
                 return {false, "", "Invalid email or password"};
             }
 
-            std::string token = generate_token(user.user_uuid, user.email);
+            std::string full_name = user.first_name + " " + user.last_name;
+            std::string token = generate_token(user.user_uuid, user.email, full_name);
 
             return {true, token, "Login successful", user};
 
@@ -113,6 +115,7 @@ public:
         bool valid = false;
         std::string user_id;
         std::string email;
+        std::string full_name;
         std::string error;
     };
 
@@ -125,17 +128,26 @@ public:
 
             verifier.verify(decoded);
 
+            // Extract full_name with fallback for backward compatibility
+            std::string full_name;
+            try {
+                full_name = decoded.get_payload_claim("full_name").as_string();
+            } catch (...) {
+                full_name = "";  // Fallback for old tokens without full_name
+            }
+
             return {
                 true,
                 decoded.get_payload_claim("user_id").as_string(),
                 decoded.get_payload_claim("email").as_string(),
+                full_name,
                 ""
             };
 
         } catch (const jwt::error::token_verification_exception& e) {
-            return {false, "", "", "Token verification failed"};
+            return {false, "", "", "", "Token verification failed"};
         } catch (const std::exception& e) {
-            return {false, "", "", std::string("Token validation error: ") + e.what()};
+            return {false, "", "", "", std::string("Token validation error: ") + e.what()};
         }
     }
 
@@ -507,7 +519,7 @@ private:
         return hash_password(password, salt) == hash;
     }
 
-    std::string generate_token(const std::string& user_id, const std::string& email) {
+    std::string generate_token(const std::string& user_id, const std::string& email, const std::string& full_name) {
         auto now = std::chrono::system_clock::now();
         auto exp = now + std::chrono::seconds(jwt_config_.expiration_seconds);
 
@@ -518,6 +530,7 @@ private:
             .set_expires_at(exp)
             .set_payload_claim("user_id", picojson::value(user_id))
             .set_payload_claim("email", picojson::value(email))
+            .set_payload_claim("full_name", picojson::value(full_name))
             .sign(jwt::algorithm::hs256{jwt_config_.secret});
     }
 };
