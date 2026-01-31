@@ -87,6 +87,6 @@ CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at ON password_rese
 -- ============================================
 -- 6. Insert default roles (optional)
 -- ============================================
-INSERT INTO roles (role_name) VALUES ('admin'), ('user')
+INSERT INTO roles (role_name) VALUES ('omega'), ('beta'), ('alpha')
 ON CONFLICT DO NOTHING;
 

@@ -23,13 +23,18 @@ public:
             return models::bad_request("Email and password are required");
         }
 
+        if (!body.has("role_id") || std::string(body["role_id"].s()).empty()) {
+            return models::bad_request("role_id is required");
+        }
+
         std::string email = body["email"].s();
         std::string password = body["password"].s();
         std::string first_name = body["first_name"].s();
         std::string last_name = body["last_name"].s();
         std::string contact_number = body["contact_number"].s();
+        std::string role_id = body["role_id"].s();
 
-        auto result = auth_service_->register_user(first_name, last_name, contact_number, email, password);
+        auto result = auth_service_->register_user(first_name, last_name, contact_number, email, password, role_id);
 
         if (!result.success) {
             return models::bad_request(result.message);

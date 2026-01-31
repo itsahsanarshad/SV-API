@@ -13,6 +13,8 @@ struct JWTAuth {
         std::string user_id;
         std::string email;
         std::string full_name;
+        std::string role_id;
+        std::string role_name;
         std::string error;
     };
 
@@ -71,6 +73,8 @@ struct JWTAuth {
         ctx.user_id = payload.user_id;
         ctx.email = payload.email;
         ctx.full_name = payload.full_name;
+        ctx.role_id = payload.role_id;
+        ctx.role_name = payload.role_name;
     }
 
     void after_handle(crow::request& req, crow::response& res, context& ctx) {

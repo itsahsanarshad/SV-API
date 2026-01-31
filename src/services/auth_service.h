@@ -31,7 +31,8 @@ public:
         const std::string& last_name,
         const std::string& contact_number,
         const std::string& email,
-        const std::string& password) {
+        const std::string& password,
+        const std::string& role_id = "") {
         if (email.empty() || password.empty()) {
             return {false, "", "Email and password are required"};
         }
@@ -64,8 +65,17 @@ public:
             }
 
             models::User user = models::User::from_row(result[0]);
+
+            // Assign role to user if role_id is provided
+            if (!role_id.empty()) {
+                db_->execute_non_query_params(
+                    "INSERT INTO users_roles_assignment (user_uuid, role_id) VALUES ($1, $2)",
+                    pqxx::params{user.user_uuid, role_id}
+                );
+            }
+
             std::string full_name = user.first_name + " " + user.last_name;
-            std::string token = generate_token(user.user_uuid, user.email, full_name);
+            std::string token = generate_token(user.user_uuid, user.email, full_name, "", "");
 
             return {true, token, "User registered successfully", user};
 
@@ -101,8 +111,25 @@ public:
                 return {false, "", "Invalid email or password"};
             }
 
+            // Fetch user's role
+            auto role_result = db_->query_params(
+                "SELECT r.role_id, r.role_name FROM roles r "
+                "INNER JOIN users_roles_assignment ura ON r.role_id = ura.role_id "
+                "WHERE ura.user_uuid = $1 LIMIT 1",
+                pqxx::params{user.user_uuid}
+            );
+
+            std::string role_id = "";
+            std::string role_name = "";
+            if (!role_result.empty()) {
+                role_id = role_result[0]["role_id"].as<std::string>();
+                role_name = role_result[0]["role_name"].as<std::string>();
+                user.role_id = role_id;
+                user.role_name = role_name;
+            }
+
             std::string full_name = user.first_name + " " + user.last_name;
-            std::string token = generate_token(user.user_uuid, user.email, full_name);
+            std::string token = generate_token(user.user_uuid, user.email, full_name, role_id, role_name);
 
             return {true, token, "Login successful", user};
 
@@ -116,6 +143,8 @@ public:
         std::string user_id;
         std::string email;
         std::string full_name;
+        std::string role_id;
+        std::string role_name;
         std::string error;
     };
 
@@ -128,12 +157,24 @@ public:
 
             verifier.verify(decoded);
 
-            // Extract full_name with fallback for backward compatibility
+            // Extract claims with fallback for backward compatibility
             std::string full_name;
+            std::string role_id;
+            std::string role_name;
             try {
                 full_name = decoded.get_payload_claim("full_name").as_string();
             } catch (...) {
-                full_name = "";  // Fallback for old tokens without full_name
+                full_name = "";
+            }
+            try {
+                role_id = decoded.get_payload_claim("role_id").as_string();
+            } catch (...) {
+                role_id = "";
+            }
+            try {
+                role_name = decoded.get_payload_claim("role_name").as_string();
+            } catch (...) {
+                role_name = "";
             }
 
             return {
@@ -141,13 +182,15 @@ public:
                 decoded.get_payload_claim("user_id").as_string(),
                 decoded.get_payload_claim("email").as_string(),
                 full_name,
+                role_id,
+                role_name,
                 ""
             };
 
         } catch (const jwt::error::token_verification_exception& e) {
-            return {false, "", "", "", "Token verification failed"};
+            return {false, "", "", "", "", "", "Token verification failed"};
         } catch (const std::exception& e) {
-            return {false, "", "", "", std::string("Token validation error: ") + e.what()};
+            return {false, "", "", "", "", "", std::string("Token validation error: ") + e.what()};
         }
     }
 
@@ -519,19 +562,25 @@ private:
         return hash_password(password, salt) == hash;
     }
 
-    std::string generate_token(const std::string& user_id, const std::string& email, const std::string& full_name) {
+    std::string generate_token(const std::string& user_id, const std::string& email, const std::string& full_name, const std::string& role_id, const std::string& role_name) {
         auto now = std::chrono::system_clock::now();
         auto exp = now + std::chrono::seconds(jwt_config_.expiration_seconds);
 
-        return jwt::create()
+        auto token_builder = jwt::create()
             .set_issuer("crow-api")
             .set_type("JWT")
             .set_issued_at(now)
             .set_expires_at(exp)
             .set_payload_claim("user_id", picojson::value(user_id))
             .set_payload_claim("email", picojson::value(email))
-            .set_payload_claim("full_name", picojson::value(full_name))
-            .sign(jwt::algorithm::hs256{jwt_config_.secret});
+            .set_payload_claim("full_name", picojson::value(full_name));
+
+        if (!role_id.empty()) {
+            token_builder.set_payload_claim("role_id", picojson::value(role_id));
+            token_builder.set_payload_claim("role_name", picojson::value(role_name));
+        }
+
+        return token_builder.sign(jwt::algorithm::hs256{jwt_config_.secret});
     }
 };
 

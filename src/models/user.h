@@ -16,6 +16,9 @@ struct User {
     std::string password_hash;
     std::string created_at;
     bool is_deleted = false;
+    // Role information (populated on login)
+    std::string role_id;
+    std::string role_name;
 
     crow::json::wvalue to_json() const {
         crow::json::wvalue json;
@@ -25,6 +28,10 @@ struct User {
         json["full_name"] = first_name + " " + last_name;
         json["email"] = email;
         json["created_at"] = created_at;
+        if (!role_id.empty()) {
+            json["role_id"] = role_id;
+            json["role_name"] = role_name;
+        }
         return json;
     }
 
