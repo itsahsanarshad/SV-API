@@ -335,12 +335,22 @@ public:
         
         try {
             auto result = db_->query(
-                "SELECT user_uuid, first_name, last_name, contact_number, email, password_hash, created_at, is_deleted "
-                "FROM users ORDER BY created_at DESC"
+                "SELECT u.user_uuid, u.first_name, u.last_name, u.contact_number, u.email, u.password_hash, u.created_at, u.is_deleted, "
+                "r.role_id, r.role_name "
+                "FROM users u "
+                "LEFT JOIN users_roles_assignment ura ON u.user_uuid = ura.user_uuid "
+                "LEFT JOIN roles r ON ura.role_id = r.role_id "
+                "ORDER BY u.created_at DESC"
             );
 
             for (const auto& row : result) {
-                users.push_back(models::User::from_row(row));
+                models::User user = models::User::from_row(row);
+                // Add role information if available
+                if (!row["role_id"].is_null()) {
+                    user.role_id = row["role_id"].as<std::string>();
+                    user.role_name = row["role_name"].as<std::string>();
+                }
+                users.push_back(user);
             }
         } catch (const std::exception& e) {
             // Return empty list on error

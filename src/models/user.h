@@ -45,6 +45,10 @@ struct User {
         json["email"] = email;
         json["created_at"] = created_at;
         json["status"] = is_deleted ? "deleted" : "active";
+        if (!role_id.empty()) {
+            json["role_id"] = role_id;
+            json["role_name"] = role_name;
+        }
         return json;
     }
 
