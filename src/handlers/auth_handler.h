@@ -240,8 +240,9 @@ public:
             std::string last_name = body.has("last_name") ? std::string(body["last_name"].s()) : std::string();
             std::string email = body.has("email") ? std::string(body["email"].s()) : std::string();
             std::string contact_number = body.has("contact_number") ? std::string(body["contact_number"].s()) : std::string();
+            std::string role_id = body.has("role_id") ? std::string(body["role_id"].s()) : std::string();
 
-            auto result = auth_service_->update_user(user_uuid, first_name, last_name, email, contact_number);
+            auto result = auth_service_->update_user(user_uuid, first_name, last_name, email, contact_number, role_id);
 
             if (!result.success) {
                 return models::bad_request(result.message);

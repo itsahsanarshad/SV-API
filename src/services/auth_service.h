@@ -419,7 +419,8 @@ public:
         const std::string& first_name,
         const std::string& last_name,
         const std::string& email,
-        const std::string& contact_number) {
+        const std::string& contact_number,
+        const std::string& role_id = "") {
         
         if (user_uuid.empty()) {
             return {false, "User ID is required", {}};
@@ -428,6 +429,17 @@ public:
         // Validate email if provided
         if (!email.empty() && !config::is_valid_email(email)) {
             return {false, "Invalid email format", {}};
+        }
+
+        // Validate role_id if provided
+        if (!role_id.empty()) {
+            auto role_check = db_->query_params(
+                "SELECT role_id FROM roles WHERE role_id = $1 AND is_deleted = FALSE",
+                pqxx::params{role_id}
+            );
+            if (role_check.empty()) {
+                return {false, "Invalid role_id. Role does not exist.", {}};
+            }
         }
 
         try {
@@ -460,7 +472,34 @@ public:
                 return {false, "User not found or has been deleted", {}};
             }
 
+            // Update role if provided (UPSERT pattern)
+            if (!role_id.empty()) {
+                // Delete existing role assignment
+                db_->execute_non_query_params(
+                    "DELETE FROM users_roles_assignment WHERE user_uuid = $1",
+                    pqxx::params{user_uuid}
+                );
+                // Insert new role assignment
+                db_->execute_non_query_params(
+                    "INSERT INTO users_roles_assignment (user_uuid, role_id) VALUES ($1, $2)",
+                    pqxx::params{user_uuid, role_id}
+                );
+            }
+
             models::User updated_user = models::User::from_row(result[0]);
+
+            // Fetch updated role info
+            auto role_result = db_->query_params(
+                "SELECT r.role_id, r.role_name FROM roles r "
+                "INNER JOIN users_roles_assignment ura ON r.role_id = ura.role_id "
+                "WHERE ura.user_uuid = $1 LIMIT 1",
+                pqxx::params{user_uuid}
+            );
+            if (!role_result.empty()) {
+                updated_user.role_id = role_result[0]["role_id"].as<std::string>();
+                updated_user.role_name = role_result[0]["role_name"].as<std::string>();
+            }
+
             return {true, "User updated successfully", updated_user};
 
         } catch (const std::exception& e) {
