@@ -51,6 +51,17 @@ public:
                 return {false, "", "Email already registered"};
             }
 
+            // Validate role_id exists before creating user
+            if (!role_id.empty()) {
+                auto role_check = db_->query_params(
+                    "SELECT role_id FROM roles WHERE role_id = $1 AND is_deleted = FALSE",
+                    pqxx::params{role_id}
+                );
+                if (role_check.empty()) {
+                    return {false, "", "Invalid role_id. Role does not exist."};
+                }
+            }
+
             std::string salt = generate_salt();
             std::string password_hash = hash_password(password, salt);
 
