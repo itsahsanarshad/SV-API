@@ -107,4 +107,33 @@ struct Resource {
     }
 };
 
+struct Role {
+    std::string role_id;
+    std::string role_name;
+    std::string created_at;
+    std::string updated_at;
+    bool is_deleted = false;
+
+    crow::json::wvalue to_json() const {
+        crow::json::wvalue json;
+        json["role_id"] = role_id;
+        json["role_name"] = role_name;
+        return json;
+    }
+
+    static Role from_row(const pqxx::row& row) {
+        Role role;
+        role.role_id = row["role_id"].as<std::string>();
+        role.role_name = row["role_name"].as<std::string>();
+        try {
+            role.created_at = row["created_at"].as<std::string>("");
+            role.updated_at = row["updated_at"].as<std::string>("");
+            role.is_deleted = row["is_deleted"].as<bool>(false);
+        } catch (...) {
+            // Optional fields
+        }
+        return role;
+    }
+};
+
 } // namespace models

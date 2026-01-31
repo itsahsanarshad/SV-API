@@ -10,9 +10,12 @@
 #include "middleware/cors_middleware.h"
 #include "handlers/auth_handler.h"
 #include "handlers/resource_handler.h"
+#include "handlers/role_handler.h"
 #include "repositories/base_repository.h"
+#include "repositories/role_repository.h"
 #include "routes/auth_routes.h"
 #include "routes/resource_routes.h"
+#include "routes/role_routes.h"
 #include "models/response.h"
 
 int main() {
@@ -29,6 +32,9 @@ int main() {
 
     auto auth_handler = std::make_shared<handlers::AuthHandler>(auth_service);
     auto resource_handler = std::make_shared<handlers::ResourceHandler>(resource_repository);
+
+    auto role_repository = std::make_shared<repositories::RoleRepository>(database);
+    auto role_handler = std::make_shared<handlers::RoleHandler>(role_repository);
 
     crow::App<middleware::CORS, middleware::JWTAuth> app(
         middleware::CORS{},
@@ -60,8 +66,12 @@ int main() {
     crow::Blueprint resources_bp("resources");
     routes::register_resource_routes(resources_bp, resource_handler, app);
 
+    crow::Blueprint roles_bp("roles");
+    routes::register_role_routes(roles_bp, role_handler);
+
     api_v1.register_blueprint(auth_bp);
     api_v1.register_blueprint(resources_bp);
+    api_v1.register_blueprint(roles_bp);
     app.register_blueprint(api_v1);
 
     CROW_CATCHALL_ROUTE(app)
@@ -91,6 +101,7 @@ int main() {
     std::cout << "  POST /api/v1/resources     - Create resource (auth required)" << std::endl;
     std::cout << "  PUT  /api/v1/resources/:id - Update resource (auth required)" << std::endl;
     std::cout << "  DELETE /api/v1/resources/:id - Delete resource (auth required)" << std::endl;
+    std::cout << "  GET  /api/v1/roles         - List all roles" << std::endl;
 
     app.port(app_config.server.port)
        .concurrency(app_config.server.threads)
