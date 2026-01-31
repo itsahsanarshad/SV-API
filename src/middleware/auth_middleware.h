@@ -27,7 +27,8 @@ struct JWTAuth {
             return;
         }
 
-        if (path == "/" || path == "/health") {
+        // Public endpoints that don't require authentication
+        if (path == "/" || path == "/health" || path.find("/roles") != std::string::npos) {
             ctx.authenticated = true;
             return;
         }
