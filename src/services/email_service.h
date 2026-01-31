@@ -34,6 +34,15 @@ public:
         return send_via_frontend_api(to_email, reset_token, locale);
     }
 
+    EmailResult send_2fa_code_email(
+        const std::string& to_email,
+        const std::string& code,
+        const std::string& locale = "en"
+    ) {
+        // Use frontend API proxy to send 2FA verification code
+        return send_2fa_via_frontend_api(to_email, code, locale);
+    }
+
 private:
     config::EmailConfig config_;
 
@@ -96,6 +105,68 @@ private:
         } catch (const std::exception& e) {
             curl_easy_cleanup(curl);
             return {false, std::string("Exception calling frontend API: ") + e.what()};
+        }
+    }
+
+    // Send 2FA code via frontend API proxy
+    EmailResult send_2fa_via_frontend_api(
+        const std::string& to_email,
+        const std::string& code,
+        const std::string& locale
+    ) {
+        CURL* curl = curl_easy_init();
+        if (!curl) {
+            return {false, "Failed to initialize CURL"};
+        }
+
+        CURLcode res;
+        std::string response_data;
+
+        try {
+            // Frontend API endpoint for 2FA
+            std::string api_url = config_.frontend_url + "/api/send-2fa-code";
+            
+            // Build JSON payload
+            std::ostringstream json_payload;
+            json_payload << "{"
+                        << "\"email\":\"" << to_email << "\","
+                        << "\"code\":\"" << code << "\","
+                        << "\"locale\":\"" << locale << "\""
+                        << "}";
+            std::string payload = json_payload.str();
+
+            // Set CURL options
+            curl_easy_setopt(curl, CURLOPT_URL, api_url.c_str());
+            curl_easy_setopt(curl, CURLOPT_POST, 1L);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload.c_str());
+            
+            // Set headers
+            struct curl_slist* headers = nullptr;
+            headers = curl_slist_append(headers, "Content-Type: application/json");
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+            
+            // Capture response
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_data);
+            
+            // Set timeout
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+            
+            // Perform request
+            res = curl_easy_perform(curl);
+            
+            curl_slist_free_all(headers);
+            curl_easy_cleanup(curl);
+            
+            if (res != CURLE_OK) {
+                return {false, std::string("Failed to send 2FA code: ") + curl_easy_strerror(res)};
+            }
+            
+            return {true, "2FA code sent via frontend API"};
+            
+        } catch (const std::exception& e) {
+            curl_easy_cleanup(curl);
+            return {false, std::string("Exception sending 2FA code: ") + e.what()};
         }
     }
 

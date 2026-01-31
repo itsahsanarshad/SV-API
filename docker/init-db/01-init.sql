@@ -90,3 +90,18 @@ CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at ON password_rese
 INSERT INTO roles (role_name) VALUES ('commander'), ('guardian'), ('analyst'), ('observer')
 ON CONFLICT DO NOTHING;
 
+-- ============================================
+-- 7. Two-Factor Authentication codes table
+-- ============================================
+CREATE TABLE IF NOT EXISTS two_factor_codes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_uuid UUID NOT NULL,
+    code VARCHAR(6) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_uuid) REFERENCES users(user_uuid) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_2fa_user_uuid ON two_factor_codes(user_uuid);
+CREATE INDEX IF NOT EXISTS idx_2fa_expires ON two_factor_codes(expires_at);

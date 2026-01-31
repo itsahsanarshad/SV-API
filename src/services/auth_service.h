@@ -2,6 +2,7 @@
 
 #include <string>
 #include <optional>
+#include <random>
 #include <openssl/sha.h>
 #include <openssl/rand.h>
 #include <sstream>
@@ -24,6 +25,9 @@ public:
         std::string token;
         std::string message;
         std::optional<models::User> user;
+        // 2FA fields
+        bool pending_2fa = false;
+        std::string user_id;
     };
 
     AuthResult register_user(
@@ -95,7 +99,7 @@ public:
         }
     }
 
-    AuthResult login(const std::string& email, const std::string& password) {
+    AuthResult login(const std::string& email, const std::string& password, const std::string& locale = "en") {
         if (email.empty() || password.empty()) {
             return {false, "", "Email and password are required"};
         }
@@ -122,6 +126,75 @@ public:
                 return {false, "", "Invalid email or password"};
             }
 
+            // Generate 2FA code
+            std::string code = generate_2fa_code();
+
+            // Invalidate any existing codes for this user
+            db_->execute_non_query_params(
+                "UPDATE two_factor_codes SET used = TRUE WHERE user_uuid = $1 AND used = FALSE",
+                pqxx::params{user.user_uuid}
+            );
+
+            // Store 2FA code with 10 minute expiry
+            db_->execute_non_query_params(
+                "INSERT INTO two_factor_codes (user_uuid, code, expires_at) VALUES ($1, $2, NOW() + INTERVAL '10 minutes')",
+                pqxx::params{user.user_uuid, code}
+            );
+
+            // Send 2FA code via email
+            if (email_service_) {
+                std::string valid_locale = (locale == "en" || locale == "es" || locale == "fr") ? locale : "en";
+                email_service_->send_2fa_code_email(user.email, code, valid_locale);
+            }
+
+            // Return pending 2FA response (no token yet)
+            AuthResult auth_result;
+            auth_result.success = true;
+            auth_result.pending_2fa = true;
+            auth_result.user_id = user.user_uuid;
+            auth_result.message = "Verification code sent to your email";
+            return auth_result;
+
+        } catch (const std::exception& e) {
+            return {false, "", std::string("Login failed: ") + e.what()};
+        }
+    }
+
+    AuthResult verify_2fa(const std::string& user_id, const std::string& code) {
+        if (user_id.empty() || code.empty()) {
+            return {false, "", "User ID and code are required"};
+        }
+
+        try {
+            // Find valid 2FA code
+            auto code_result = db_->query_params(
+                "SELECT id FROM two_factor_codes WHERE user_uuid = $1 AND code = $2 AND used = FALSE AND expires_at > NOW() LIMIT 1",
+                pqxx::params{user_id, code}
+            );
+
+            if (code_result.empty()) {
+                return {false, "", "Invalid or expired verification code"};
+            }
+
+            // Mark code as used
+            std::string code_id = code_result[0]["id"].as<std::string>();
+            db_->execute_non_query_params(
+                "UPDATE two_factor_codes SET used = TRUE WHERE id = $1",
+                pqxx::params{code_id}
+            );
+
+            // Fetch user details
+            auto user_result = db_->query_params(
+                "SELECT user_uuid, first_name, last_name, contact_number, email, password_hash, created_at, is_deleted FROM users WHERE user_uuid = $1",
+                pqxx::params{user_id}
+            );
+
+            if (user_result.empty()) {
+                return {false, "", "User not found"};
+            }
+
+            models::User user = models::User::from_row(user_result[0]);
+
             // Fetch user's role
             auto role_result = db_->query_params(
                 "SELECT r.role_id, r.role_name FROM roles r "
@@ -139,13 +212,65 @@ public:
                 user.role_name = role_name;
             }
 
+            // Generate JWT token
             std::string full_name = user.first_name + " " + user.last_name;
             std::string token = generate_token(user.user_uuid, user.email, full_name, role_id, role_name);
 
             return {true, token, "Login successful", user};
 
         } catch (const std::exception& e) {
-            return {false, "", std::string("Login failed: ") + e.what()};
+            return {false, "", std::string("Verification failed: ") + e.what()};
+        }
+    }
+
+    AuthResult resend_2fa(const std::string& user_id, const std::string& locale = "en") {
+        if (user_id.empty()) {
+            return {false, "", "User ID is required"};
+        }
+
+        try {
+            // Get user email
+            auto user_result = db_->query_params(
+                "SELECT email FROM users WHERE user_uuid = $1 AND is_deleted = FALSE",
+                pqxx::params{user_id}
+            );
+
+            if (user_result.empty()) {
+                return {false, "", "User not found"};
+            }
+
+            std::string email = user_result[0]["email"].as<std::string>();
+
+            // Generate new 2FA code
+            std::string code = generate_2fa_code();
+
+            // Invalidate any existing codes for this user
+            db_->execute_non_query_params(
+                "UPDATE two_factor_codes SET used = TRUE WHERE user_uuid = $1 AND used = FALSE",
+                pqxx::params{user_id}
+            );
+
+            // Store new 2FA code with 10 minute expiry
+            db_->execute_non_query_params(
+                "INSERT INTO two_factor_codes (user_uuid, code, expires_at) VALUES ($1, $2, NOW() + INTERVAL '10 minutes')",
+                pqxx::params{user_id, code}
+            );
+
+            // Send 2FA code via email
+            if (email_service_) {
+                std::string valid_locale = (locale == "en" || locale == "es" || locale == "fr") ? locale : "en";
+                email_service_->send_2fa_code_email(email, code, valid_locale);
+            }
+
+            AuthResult auth_result;
+            auth_result.success = true;
+            auth_result.pending_2fa = true;
+            auth_result.user_id = user_id;
+            auth_result.message = "New verification code sent to your email";
+            return auth_result;
+
+        } catch (const std::exception& e) {
+            return {false, "", std::string("Resend failed: ") + e.what()};
         }
     }
 
@@ -537,6 +662,14 @@ private:
         }
         return ss.str();
     }
+
+    std::string generate_2fa_code() {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(100000, 999999);
+        return std::to_string(dis(gen));
+    }
+
 
     std::string generate_salt(size_t length = 16) {
         std::vector<unsigned char> salt(length);

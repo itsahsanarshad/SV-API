@@ -17,6 +17,16 @@ inline void register_auth_routes(crow::Blueprint& bp, std::shared_ptr<handlers::
         return handler->handle_login(req);
     });
 
+    CROW_BP_ROUTE(bp, "/verify-2fa").methods("POST"_method)
+    ([handler](const crow::request& req) {
+        return handler->handle_verify_2fa(req);
+    });
+
+    CROW_BP_ROUTE(bp, "/resend-2fa").methods("POST"_method)
+    ([handler](const crow::request& req) {
+        return handler->handle_resend_2fa(req);
+    });
+
     CROW_BP_ROUTE(bp, "/forgot-password").methods("POST"_method)
     ([handler](const crow::request& req) {
         return handler->handle_forgot_password(req);
