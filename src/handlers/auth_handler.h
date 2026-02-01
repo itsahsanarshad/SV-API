@@ -282,6 +282,36 @@ public:
         return models::make_success_msg(result.message);
     }
 
+    crow::response handle_update_nda(const crow::request& req, const std::string& user_uuid) {
+        try {
+            auto body = crow::json::load(req.body);
+            if (!body) {
+                return models::bad_request("Invalid JSON");
+            }
+
+            if (!body.has("is_nda_signed")) {
+                return models::bad_request("is_nda_signed field is required");
+            }
+
+            bool is_nda_signed = body["is_nda_signed"].b();
+
+            auto result = auth_service_->update_nda_status(user_uuid, is_nda_signed);
+
+            if (!result.success) {
+                return models::bad_request(result.message);
+            }
+
+            crow::json::wvalue data;
+            data["user_id"] = result.user_id;
+            data["is_nda_signed"] = result.is_nda_signed;
+
+            return models::make_success(std::move(data), result.message);
+
+        } catch (const std::exception& e) {
+            return models::internal_error("Failed to update NDA status", e.what());
+        }
+    }
+
 private:
     std::shared_ptr<services::AuthService> auth_service_;
 };

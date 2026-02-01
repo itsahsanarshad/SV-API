@@ -106,7 +106,7 @@ public:
 
         try {
             auto result = db_->query_params(
-                "SELECT user_uuid, first_name, last_name, contact_number, email, password_hash, created_at, is_deleted FROM users WHERE email = $1 ",
+                "SELECT user_uuid, first_name, last_name, contact_number, email, password_hash, created_at, is_deleted, is_nda_signed FROM users WHERE email = $1 ",
                 pqxx::params{email}
             );
 
@@ -185,7 +185,7 @@ public:
 
             // Fetch user details
             auto user_result = db_->query_params(
-                "SELECT user_uuid, first_name, last_name, contact_number, email, password_hash, created_at, is_deleted FROM users WHERE user_uuid = $1",
+                "SELECT user_uuid, first_name, last_name, contact_number, email, password_hash, created_at, is_deleted, is_nda_signed FROM users WHERE user_uuid = $1",
                 pqxx::params{user_id}
             );
 
@@ -214,7 +214,7 @@ public:
 
             // Generate JWT token
             std::string full_name = user.first_name + " " + user.last_name;
-            std::string token = generate_token(user.user_uuid, user.email, full_name, role_id, role_name);
+            std::string token = generate_token(user.user_uuid, user.email, full_name, role_id, role_name, user.is_nda_signed);
 
             return {true, token, "Login successful", user};
 
@@ -281,6 +281,7 @@ public:
         std::string full_name;
         std::string role_id;
         std::string role_name;
+        bool is_nda_signed = false;
         std::string error;
     };
 
@@ -312,6 +313,12 @@ public:
             } catch (...) {
                 role_name = "";
             }
+            bool is_nda_signed = false;
+            try {
+                is_nda_signed = decoded.get_payload_claim("is_nda_signed").as_bool();
+            } catch (...) {
+                is_nda_signed = false;
+            }
 
             return {
                 true,
@@ -320,13 +327,14 @@ public:
                 full_name,
                 role_id,
                 role_name,
+                is_nda_signed,
                 ""
             };
 
         } catch (const jwt::error::token_verification_exception& e) {
-            return {false, "", "", "", "", "", "Token verification failed"};
+            return {false, "", "", "", "", "", false, "Token verification failed"};
         } catch (const std::exception& e) {
-            return {false, "", "", "", "", "", std::string("Token validation error: ") + e.what()};
+            return {false, "", "", "", "", "", false, std::string("Token validation error: ") + e.what()};
         }
     }
 
@@ -335,7 +343,7 @@ public:
         
         try {
             auto result = db_->query(
-                "SELECT u.user_uuid, u.first_name, u.last_name, u.contact_number, u.email, u.password_hash, u.created_at, u.is_deleted, "
+                "SELECT u.user_uuid, u.first_name, u.last_name, u.contact_number, u.email, u.password_hash, u.created_at, u.is_deleted, u.is_nda_signed, "
                 "r.role_id, r.role_name "
                 "FROM users u "
                 "LEFT JOIN users_roles_assignment ura ON u.user_uuid = ura.user_uuid "
@@ -405,6 +413,35 @@ public:
 
         } catch (const std::exception& e) {
             return {false, std::string("Failed to grant access: ") + e.what()};
+        }
+    }
+
+    struct NdaUpdateResult {
+        bool success = false;
+        std::string message;
+        std::string user_id;
+        bool is_nda_signed = false;
+    };
+
+    NdaUpdateResult update_nda_status(const std::string& user_uuid, bool is_nda_signed) {
+        if (user_uuid.empty()) {
+            return {false, "User ID is required", "", false};
+        }
+
+        try {
+            auto result = db_->query_params(
+                "UPDATE users SET is_nda_signed = $2, updated_at = CURRENT_TIMESTAMP WHERE user_uuid = $1 AND is_deleted = FALSE RETURNING user_uuid, is_nda_signed",
+                pqxx::params{user_uuid, is_nda_signed}
+            );
+
+            if (result.empty()) {
+                return {false, "User not found or has been deleted", "", false};
+            }
+
+            return {true, "NDA status updated successfully", user_uuid, result[0]["is_nda_signed"].as<bool>()};
+
+        } catch (const std::exception& e) {
+            return {false, std::string("Failed to update NDA status: ") + e.what(), "", false};
         }
     }
 
@@ -755,7 +792,7 @@ private:
         return hash_password(password, salt) == hash;
     }
 
-    std::string generate_token(const std::string& user_id, const std::string& email, const std::string& full_name, const std::string& role_id, const std::string& role_name) {
+    std::string generate_token(const std::string& user_id, const std::string& email, const std::string& full_name, const std::string& role_id, const std::string& role_name, bool is_nda_signed = false) {
         auto now = std::chrono::system_clock::now();
         auto exp = now + std::chrono::seconds(jwt_config_.expiration_seconds);
 
@@ -766,7 +803,8 @@ private:
             .set_expires_at(exp)
             .set_payload_claim("user_id", picojson::value(user_id))
             .set_payload_claim("email", picojson::value(email))
-            .set_payload_claim("full_name", picojson::value(full_name));
+            .set_payload_claim("full_name", picojson::value(full_name))
+            .set_payload_claim("is_nda_signed", picojson::value(is_nda_signed));
 
         if (!role_id.empty()) {
             token_builder.set_payload_claim("role_id", picojson::value(role_id));

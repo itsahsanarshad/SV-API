@@ -16,6 +16,7 @@ struct User {
     std::string password_hash;
     std::string created_at;
     bool is_deleted = false;
+    bool is_nda_signed = false;
     // Role information (populated on login)
     std::string role_id;
     std::string role_name;
@@ -28,6 +29,7 @@ struct User {
         json["full_name"] = first_name + " " + last_name;
         json["email"] = email;
         json["created_at"] = created_at;
+        json["is_nda_signed"] = is_nda_signed;
         if (!role_id.empty()) {
             json["role_id"] = role_id;
             json["role_name"] = role_name;
@@ -45,6 +47,7 @@ struct User {
         json["email"] = email;
         json["created_at"] = created_at;
         json["status"] = is_deleted ? "deleted" : "active";
+        json["is_nda_signed"] = is_nda_signed;
         if (!role_id.empty()) {
             json["role_id"] = role_id;
             json["role_name"] = role_name;
@@ -66,6 +69,12 @@ struct User {
             user.is_deleted = row["is_deleted"].as<bool>(false);
         } catch (...) {
             user.is_deleted = false;
+        }
+        // Check if is_nda_signed column exists in result
+        try {
+            user.is_nda_signed = row["is_nda_signed"].as<bool>(false);
+        } catch (...) {
+            user.is_nda_signed = false;
         }
         return user;
     }
