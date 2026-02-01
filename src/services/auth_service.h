@@ -315,7 +315,7 @@ public:
             }
             bool is_nda_signed = false;
             try {
-                is_nda_signed = decoded.get_payload_claim("is_nda_signed").as_bool();
+                is_nda_signed = decoded.get_payload_claim("is_nda_signed").as_boolean();
             } catch (...) {
                 is_nda_signed = false;
             }
